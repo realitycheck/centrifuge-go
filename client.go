@@ -32,6 +32,8 @@ var (
 	ErrReconnectFailed = errors.New("reconnect failed")
 	// ErrDuplicateSubscription ...
 	ErrDuplicateSubscription = errors.New("duplicate subscription")
+	// ErrNoTransport ...
+	ErrNoTransport = errors.New("no transport")
 )
 
 const (
@@ -1357,6 +1359,13 @@ func (c *Client) send(cmd *proto.Command) error {
 	case <-c.closeCh:
 		return ErrClientDisconnected
 	default:
+		/* HOTFIX (realitycheck): ErrNoTransport might happen here occasionally
+		   due to a disconnect event while trying send a ping from pinger goroutine
+		   on a high error rate right after the connect event.
+		*/
+		if c.transport == nil {
+			return ErrNoTransport
+		}
 		err := c.transport.Write(cmd, c.config.WriteTimeout)
 		if err != nil {
 			go c.handleDisconnect(&disconnect{Reason: "write error", Reconnect: true})
